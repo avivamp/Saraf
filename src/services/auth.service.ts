@@ -27,6 +27,7 @@ export const AuthService = {
     // Fire-and-forget side effects — do not await so UI isn't blocked
     void AuthService._upsertProfile(data.user);
     void AuthService._logSession(data.user.id);
+    void AuthService._linkGuestOrders(data.user.email ?? '', data.user.id);
 
     return { data: { user: data.user, session: data.session }, error: null };
   },
@@ -55,6 +56,8 @@ export const AuthService = {
     if (data.session) {
       // Session is live — safe to write profile (auth.uid() is set)
       void AuthService._upsertProfile(data.user);
+      // Link any guest orders placed with this email before account creation
+      void AuthService._linkGuestOrders(data.user.email ?? '', data.user.id);
     }
 
     return { data: { user: data.user, requiresConfirmation }, error: null };
@@ -93,5 +96,15 @@ export const AuthService = {
       platform: Platform.OS as IUserSession['platform'],
     };
     await supabase.from('user_sessions').insert(entry);
+  },
+
+  async _linkGuestOrders(email: string, userId: string): Promise<void> {
+    if (!email) return;
+    // Calls the security-definer RPC which updates guest orders
+    // matching the email to the new user_id — bypasses RLS safely
+    await supabase.rpc('link_guest_orders', {
+      p_email:   email.toLowerCase().trim(),
+      p_user_id: userId,
+    });
   },
 } as const;

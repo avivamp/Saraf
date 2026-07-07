@@ -5,6 +5,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { navigationRef } from '@navigation/navigationRef';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 
@@ -17,6 +18,11 @@ import { CheckoutScreen }   from '@screens/CheckoutScreen';
 import { ProfileScreen }    from '@screens/ProfileScreen';
 import { OrdersScreen }     from '@screens/OrdersScreen';
 import { AuthScreen }       from '@screens/AuthScreen';
+import { FeedbackScreen }       from '@screens/FeedbackScreen';
+import { NotificationsScreen }  from '@screens/NotificationsScreen';
+import { LanguageScreen }       from '@screens/LanguageScreen';
+import { HelpScreen }           from '@screens/HelpScreen';
+import { PolicyScreen }         from '@screens/PolicyScreen';
 
 import type {
   CatalogStackParamList,
@@ -69,9 +75,18 @@ const PS = createNativeStackNavigator<ProfileStackParamList>();
 function ProfileNavigator() {
   return (
     <PS.Navigator screenOptions={STACK_CONTENT}>
-      <PS.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
-      <PS.Screen name="Orders"  component={OrdersScreen}  options={headerOpts('My Orders')} />
-      <PS.Screen name="Auth"    component={AuthScreen}    options={({ route }) => headerOpts(route.params?.mode === 'signup' ? 'Create Account' : 'Sign In')} />
+      <PS.Screen name="Profile"       component={ProfileScreen}       options={{ headerShown: false }} />
+      <PS.Screen name="Orders"        component={OrdersScreen}        options={headerOpts('My Orders')} />
+      <PS.Screen name="Auth"          component={AuthScreen}          options={({ route }) => headerOpts(route.params?.mode === 'signup' ? 'Create Account' : 'Sign In')} />
+      <PS.Screen name="Feedback"      component={FeedbackScreen}      options={headerOpts('Feedback')} />
+      <PS.Screen name="Notifications" component={NotificationsScreen} options={headerOpts('Notifications')} />
+      <PS.Screen name="Language"      component={LanguageScreen}      options={headerOpts('Language & Region')} />
+      <PS.Screen name="Help"          component={HelpScreen}          options={headerOpts('Help Center')} />
+      <PS.Screen name="Policy"        component={PolicyScreen}        options={({ route }) => headerOpts(
+        route.params.policyId === 'return'           ? 'Return Policy'     :
+        route.params.policyId === 'privacy'          ? 'Privacy Policy'    :
+        'Consumer Rights'
+      )} />
     </PS.Navigator>
   );
 }
@@ -99,7 +114,7 @@ function TabIcon({ route, focused }: { route: string; focused: boolean }) {
 
 export function AppNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,

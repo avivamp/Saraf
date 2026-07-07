@@ -25,25 +25,47 @@ export interface CustomizationGroup {
   options: CustomizationOption[];
 }
 
-export interface IProduct {
-  id: string;
-  name: string;
-  cat: ProductCategory;
-  tagline: string;
-  description: string;
-  price: number;
-  icon: string | null;
-  badge: string;
-  image_url: string | null;
-  customizations: CustomizationGroup[];
+export interface ProductImage {
+  id:         string;
+  url:        string;
+  alt_text:   string | null;
   sort_order: number;
-  active: boolean;
+}
+
+export interface IProduct {
+  id:             string;
+  name:           string;
+  cat:            string;
+  tagline:        string;
+  description:    string;
+  price:          number;
+  icon:           string | null;
+  badge:          string;
+  image_url:      string | null;   // primary/thumbnail (first image)
+  images:         ProductImage[];  // full ordered gallery
+  customizations: CustomizationGroup[];
+  sort_order:     number;
+  active:         boolean;
+  created_at:     string;
+  updated_at:     string;
+}
+
+// ─────────────────────────────────────────────
+// CATEGORY  (dynamic — managed in Supabase)
+// ─────────────────────────────────────────────
+
+export interface ICategory {
+  id:         string;
+  name:       string;
+  icon:       string | null;
+  sort_order: number;
+  active:     boolean;
   created_at: string;
   updated_at: string;
 }
 
-export type ProductCategory = 'Food' | 'Clothes' | 'Cars';
-export const PRODUCT_CATEGORIES: ProductCategory[] = ['Food', 'Clothes', 'Cars'];
+/** Legacy string alias — use ICategory.name at runtime */
+export type ProductCategory = string;
 
 // ─────────────────────────────────────────────
 // CART
@@ -85,21 +107,23 @@ export interface OrderItem {
 }
 
 export interface IOrder {
-  id: string;
-  user_id: string;
-  status: OrderStatus;
-  total: number;
-  card_saved: boolean;
-  guest_mode: boolean;
-  created_at: string;
-  items: OrderItem[];
+  id:          string;
+  user_id:     string | null;
+  guest_email: string | null;
+  status:      OrderStatus;
+  total:       number;
+  card_saved:  boolean;
+  guest_mode:  boolean;
+  created_at:  string;
+  items:       OrderItem[];
 }
 
 export interface PlaceOrderPayload {
-  userId: string;
-  cart: CartLine[];
-  total: number;
-  cardSaved: boolean;
+  userId:     string | null;
+  guestEmail: string | null;
+  cart:       CartLine[];
+  total:      number;
+  cardSaved:  boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -126,6 +150,29 @@ export interface IUserSession {
 
 export interface AppStats {
   visitors: number;
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+export type NotificationType = 'general' | 'product' | 'category' | 'order';
+
+export interface NotificationPayload {
+  product_id?: string;
+  category?:   string;
+  order_id?:   string;
+}
+
+export interface INotification {
+  id:       string;
+  user_id:  string | null;   // null = broadcast
+  title:    string;
+  body:     string;
+  type:     NotificationType;
+  payload:  NotificationPayload;
+  is_read:  boolean;
+  sent_at:  string;
 }
 
 // ─────────────────────────────────────────────
@@ -161,9 +208,14 @@ export type CartStackParamList = {
 };
 
 export type ProfileStackParamList = {
-  Profile: undefined;
-  Orders:  undefined;
-  Auth:    { mode?: AuthModalMode };
+  Profile:       undefined;
+  Orders:        undefined;
+  Auth:          { mode?: AuthModalMode };
+  Feedback:      undefined;
+  Notifications: undefined;
+  Language:      undefined;
+  Help:          undefined;
+  Policy:        { policyId: 'return' | 'privacy' | 'consumer_rights' };
 };
 
 export type RootTabParamList = {

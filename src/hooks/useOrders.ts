@@ -30,20 +30,12 @@ export function useOrders() {
   const placeOrderMutation = useMutation({
     mutationFn: (payload: PlaceOrderPayload) => OrdersService.placeOrder(payload),
     onSuccess: async (orderId, variables) => {
-      // Invalidate order list so history reflects new order
-      await queryClient.invalidateQueries({ queryKey: ordersQueryKey(variables.userId) });
-
-      // Clear remote cart
-      void CartService.clear(variables.userId);
-
-      // Clear in-memory cart
+      if (variables.userId) {
+        await queryClient.invalidateQueries({ queryKey: ordersQueryKey(variables.userId) });
+        void CartService.clear(variables.userId); // only for signed-in users
+      }
       clear();
-
-      showSuccess({
-        orderId,
-        amount:    variables.total,
-        cardSaved: variables.cardSaved,
-      });
+      showSuccess({ orderId, amount: variables.total, cardSaved: variables.cardSaved });
     },
     onError: (err: Error) => {
       pushToast(`Order failed: ${err.message}`, 'error');

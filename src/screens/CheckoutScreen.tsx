@@ -20,8 +20,7 @@ import { Button }    from '@components/ui/Button';
 import { TextInput } from '@components/ui/TextInput';
 import { useCart }   from '@hooks/useCart';
 import { useOrders } from '@hooks/useOrders';
-import { useAuthStore, selectUser, selectIsGuest } from '@store/auth.store';
-import { useUIStore } from '@store/ui.store';
+import { useAuthStore, selectUser } from '@store/auth.store';
 import type { CartStackParamList } from '@types';
 
 const fmt = (n: number) => 'AED ' + Math.round(n).toLocaleString('en-US');
@@ -30,18 +29,16 @@ type Props = NativeStackScreenProps<CartStackParamList, 'Checkout'>;
 
 export function CheckoutScreen({ navigation }: Props) {
   const { lines, subtotal, clear } = useCart();
-  const { placeOrder, isPlacing } = useOrders();
+  const { placeOrder, isPlacing }  = useOrders();
   const user    = useAuthStore(selectUser);
-  const isGuest = useAuthStore(selectIsGuest);
-  const { openAuth: _openAuth } = useUIStore(); // reserved for future use
 
-  const [name,     setName]     = useState(user?.user_metadata?.['full_name'] ?? '');
-  const [card,     setCard]     = useState('');
-  const [exp,      setExp]      = useState('');
-  const [cvv,      setCvv]      = useState('');
-  const [saveCard, setSaveCard] = useState(true);
+  const [name,       setName]       = useState(user?.user_metadata?.['full_name'] ?? '');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [card,       setCard]       = useState('');
+  const [exp,        setExp]        = useState('');
+  const [cvv,        setCvv]        = useState('');
+  const [saveCard,   setSaveCard]   = useState(true);
 
-  // Pre-fill name when user becomes known
   useEffect(() => {
     if (user) setName((user.user_metadata?.['full_name'] as string | undefined) ?? '');
   }, [user]);
@@ -49,26 +46,49 @@ export function CheckoutScreen({ navigation }: Props) {
   const formatCard = (v: string) =>
     v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
 
+  const formatExpiry = (v: string) => {
+    // Strip non-digits
+    const digits = v.replace(/\D/g, '').slice(0, 4);
+    // Auto-insert '/' after 2 digits
+    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  const expiryValid = (v: string): boolean => {
+    const match = /^(\d{2})\/(\d{2})$/.exec(v);
+    if (!match) return false;
+    const month = parseInt(match[1]!, 10);
+    const year  = parseInt(match[2]!, 10) + 2000;
+    if (month < 1 || month > 12) return false;
+    const now = new Date();
+    const expDate = new Date(year, month - 1, 1); // first of expiry month
+    // Valid if expiry month/year is current month or later
+    return expDate >= new Date(now.getFullYear(), now.getMonth(), 1);
+  };
+
+  const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
   const isValid =
     name.trim().length > 1 &&
     card.replace(/\s/g, '').length >= 12 &&
-    cvv.length >= 3;
+    expiryValid(exp) &&
+    cvv.length >= 3 &&
+    (!!user || emailValid(guestEmail));   // guest must supply a valid email
 
   const handlePay = () => {
-    if (!user && !isGuest) {
-      navigation.getParent()?.navigate('ProfileTab');
-      return;
-    }
-    if (!user) {
-      // Guest — simulate, no DB write
-      useUIStore.getState().showSuccess({ orderId: null, amount: subtotal, cardSaved: saveCard });
-      clear();
-      navigation.popToTop();
-      return;
-    }
-    // Signed in — placeOrder mutation fires showSuccess on success
-    placeOrder({ userId: user.id, cart: lines, total: subtotal, cardSaved: saveCard });
-    navigation.popToTop();
+    const resolvedEmail = user ? user.email! : guestEmail.trim();
+    placeOrder({
+      userId:     user?.id ?? null,
+      guestEmail: user ? null : resolvedEmail,
+      cart:       lines,
+      total:      subtotal,
+      cardSaved:  saveCard,
+    });
+    // Do NOT navigate here — placeOrder is async and its onSuccess handler
+    // calls showSuccess() which displays the SuccessOverlay. That overlay's
+    // "Back to Flexing" button navigates to CatalogTab via navigationRef,
+    // clearing the stack cleanly. Navigating here would send the user to
+    // Cart before the overlay appears.
   };
 
   return (
@@ -87,7 +107,7 @@ export function CheckoutScreen({ navigation }: Props) {
         {/* Account status pill */}
         <Pressable
           style={styles.accountPill}
-          onPress={() => openAuth(user ? 'account' : 'choice', 'checkout')}
+          onPress={() => navigation.getParent()?.navigate('ProfileTab')}
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.pillLabel}>{user ? 'SIGNED IN AS' : 'CHECKING OUT AS'}</Text>
@@ -95,6 +115,29 @@ export function CheckoutScreen({ navigation }: Props) {
           </View>
           <Text style={styles.pillSwitch}>{user ? 'Switch' : 'Sign In'}</Text>
         </Pressable>
+
+        {/* Guest email — only shown when not signed in */}
+        {!user && (
+          <View style={styles.guestEmailWrap}>
+            <Text style={styles.guestEmailTitle}>Enter your email address</Text>
+            <Text style={styles.guestEmailSub}>
+              We'll save your order against this email. If you create an account
+              later with the same address, this order will appear in your history.
+            </Text>
+            <TextInput
+              label="Email Address"
+              value={guestEmail}
+              onChangeText={setGuestEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.field}
+            />
+            {guestEmail.length > 3 && !emailValid(guestEmail) && (
+              <Text style={styles.emailError}>Please enter a valid email address.</Text>
+            )}
+          </View>
+        )}
 
         {/* Disclaimer */}
         <View style={styles.disclaimer}>
@@ -107,8 +150,20 @@ export function CheckoutScreen({ navigation }: Props) {
         <TextInput label="Card Number (Fake)" value={card} onChangeText={(v) => setCard(formatCard(v))} placeholder="0000 0000 0000 0000" keyboardType="number-pad" mono style={styles.field} />
 
         <View style={styles.row}>
-          <TextInput label="Expiry" value={exp} onChangeText={(v) => setExp(v.slice(0, 5))} placeholder="MM/YY" mono style={styles.halfField} />
-          <TextInput label="CVV"    value={cvv} onChangeText={(v) => setCvv(v.replace(/\D/g, '').slice(0, 4))} placeholder="000" keyboardType="number-pad" secureTextEntry mono style={styles.halfField} />
+          <View style={styles.halfField}>
+            <TextInput
+              label="Expiry"
+              value={exp}
+              onChangeText={(v) => setExp(formatExpiry(v))}
+              placeholder="MM/YY"
+              keyboardType="number-pad"
+              mono
+            />
+            {exp.length > 0 && !expiryValid(exp) && exp.length === 5 && (
+              <Text style={styles.fieldError}>Invalid or expired date</Text>
+            )}
+          </View>
+          <TextInput label="CVV" value={cvv} onChangeText={(v) => setCvv(v.replace(/\D/g, '').slice(0, 4))} placeholder="000" keyboardType="number-pad" secureTextEntry mono style={styles.halfField} />
         </View>
 
         {/* Save card toggle */}
@@ -158,6 +213,19 @@ const styles = StyleSheet.create({
   pillLabel: { color: COLORS.textSecondary, fontSize: TYPOGRAPHY.size['2xs'], letterSpacing: 1 },
   pillValue: { color: COLORS.textPrimary,   fontSize: TYPOGRAPHY.size.sm,     fontWeight: TYPOGRAPHY.weight.semibold, marginTop: 2 },
   pillSwitch:{ color: COLORS.goldBright,    fontSize: TYPOGRAPHY.size.xs,     fontWeight: TYPOGRAPHY.weight.bold },
+
+  guestEmailWrap: {
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth:     1,
+    borderColor:     COLORS.goldSubtle,
+    borderRadius:    RADII.lg,
+    padding:         SPACING['4'],
+    marginBottom:    SPACING['4'],
+  },
+  guestEmailTitle: { color: COLORS.goldBright,    fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, marginBottom: SPACING['1'] },
+  guestEmailSub:   { color: COLORS.textSecondary, fontSize: TYPOGRAPHY.size.xs, lineHeight: TYPOGRAPHY.size.xs * 1.6, marginBottom: SPACING['3'] },
+  emailError:  { color: COLORS.error, fontSize: TYPOGRAPHY.size.xs, marginTop: SPACING['1'] },
+  fieldError:  { color: COLORS.error, fontSize: TYPOGRAPHY.size.xs, marginTop: SPACING['1'] },
 
   disclaimer: {
     backgroundColor: COLORS.errorTint, borderWidth: 1, borderColor: `${COLORS.error}55`,

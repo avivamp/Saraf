@@ -16,17 +16,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { navigationRef } from '@navigation/navigationRef';
 
 import { COLORS, TYPOGRAPHY, SPACING, RADII, Z } from '@constants/design';
 import { TopBar }        from '@components/layout/TopBar';
 import { ProductCard }   from '@components/product/ProductCard';
 import { Button }        from '@components/ui/Button';
 
-import { useProducts }   from '@hooks/useProducts';
-import { useCart }       from '@hooks/useCart';
+import { useProducts }      from '@hooks/useProducts';
+import { useCart }          from '@hooks/useCart';
+import { useNotifications } from '@hooks/useNotifications';
+import { useCategories }    from '@hooks/useCategories';
+import { useAppConfig }     from '@hooks/useAppConfig';
+import { useLanguage }      from '@hooks/useLanguage';
 import { useAuthStore, selectUser }  from '@store/auth.store';
 import { useUIStore }    from '@store/ui.store';
-import { PRODUCT_CATEGORIES } from '@types';
 import type { CatalogStackParamList } from '@types';
 
 type Props = NativeStackScreenProps<CatalogStackParamList, 'Catalog'>;
@@ -39,6 +43,11 @@ export function CatalogScreen({ navigation }: Props) {
   const { filteredProducts, isLoading, isError, error, refetch } = useProducts();
   const { addItem, increment, decrement, totalItems }             = useCart();
   const { lines }                                                 = useCart();
+  const { unreadCount }                                           = useNotifications();
+  const { activeCategories }                                      = useCategories();
+  const config                                                    = useAppConfig();
+  const { t, language }                                           = useLanguage();
+  const [searchQuery, setSearchQuery]                             = React.useState('');
   const user                                                       = useAuthStore(selectUser);
   const { activeCategory, setActiveCategory, openAuth, pushToast } = useUIStore();
   const [refreshing, setRefreshing]                                = React.useState(false);
@@ -65,64 +74,85 @@ export function CatalogScreen({ navigation }: Props) {
     if (line) decrement(line.id);
   };
 
+  const CategoryTabs = (
+    <View style={styles.tabsWrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsContent}
+      >
+        {['All', ...activeCategories.map((c) => c.name)].map((cat) => (
+          <Pressable
+            key={cat}
+            onPress={() => { setActiveCategory(cat); setSearchQuery(''); }}
+            style={[styles.tab, activeCategory === cat && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, activeCategory === cat && styles.tabTextActive]}>
+              {cat === 'All'
+                ? t('All', 'الكل')
+                : `${activeCategories.find((c) => c.name === cat)?.icon ?? ''} ${cat}`.trim()}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  // Apply search filter on top of category filter
+  const displayProducts = searchQuery.trim().length > 1
+    ? filteredProducts.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.tagline.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : filteredProducts;
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <TopBar
         cartCount={totalItems}
         user={user}
+        appName={config.app_name}
+        appTagline={t(config.app_tagline_en, config.app_tagline_ar)}
+        logoUrl={config.app_logo_url || undefined}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchClose={() => setSearchQuery('')}
         onPressCart={() => navigation.getParent()?.navigate('CartTab')}
         onPressAccount={() => navigation.getParent()?.navigate('ProfileTab')}
+        onPressBell={() => {
+          navigation.getParent()?.navigate('ProfileTab');
+          setTimeout(() => navigationRef.isReady() && (navigationRef as any).navigate('Notifications'), 300);
+        }}
+        unreadCount={unreadCount}
         cartShaking={cartShaking}
       />
 
-      {/* Category filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabs}
-        contentContainerStyle={styles.tabsContent}
-      >
-        {(['All', ...PRODUCT_CATEGORIES] as const).map((cat) => (
-          <Pressable
-            key={cat}
-            onPress={() => setActiveCategory(cat)}
-            style={[styles.tab, activeCategory === cat && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, activeCategory === cat && styles.tabTextActive]}>
-              {cat}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Product grid */}
       {isLoading ? (
-        <View style={styles.state}>
-          <ActivityIndicator color={COLORS.gold} size="large" />
-          <Text style={styles.stateText}>Loading catalogue…</Text>
-        </View>
+        <>
+          {CategoryTabs}
+          <View style={styles.state}>
+            <ActivityIndicator color={COLORS.gold} size="large" />
+            <Text style={styles.stateText}>Loading catalogue…</Text>
+          </View>
+        </>
       ) : isError ? (
-        <View style={styles.state}>
-          <Text style={styles.stateEmoji}>⚠️</Text>
-          <Text style={styles.stateText}>{error}</Text>
-          <Button variant="ghost" onPress={() => refetch()} style={styles.retryBtn}>
-            Retry
-          </Button>
-        </View>
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.state}>
-          <Text style={styles.stateEmoji}>🪙</Text>
-          <Text style={styles.stateText}>
-            {activeCategory === 'All' ? 'No products yet.' : `No items in "${activeCategory}"`}
-          </Text>
-        </View>
+        <>
+          {CategoryTabs}
+          <View style={styles.state}>
+            <Text style={styles.stateEmoji}>⚠️</Text>
+            <Text style={styles.stateText}>{error}</Text>
+            <Button variant="ghost" onPress={() => refetch()} style={styles.retryBtn}>Retry</Button>
+          </View>
+        </>
       ) : (
         <FlatList
-          data={filteredProducts}
+          data={displayProducts}
           keyExtractor={(p) => p.id}
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.grid}
+          stickyHeaderIndices={[0]}
+          ListHeaderComponent={CategoryTabs}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
           renderItem={({ item }) => (
             <View style={{ width: CARD_W }}>
@@ -135,6 +165,18 @@ export function CatalogScreen({ navigation }: Props) {
               />
             </View>
           )}
+          ListEmptyComponent={
+            <View style={styles.state}>
+              <Text style={styles.stateEmoji}>{searchQuery ? '🔍' : '🪙'}</Text>
+              <Text style={styles.stateText}>
+                {searchQuery
+                  ? t(`No results for "${searchQuery}"`, `لا توجد نتائج لـ "${searchQuery}"`)
+                  : activeCategory === 'All'
+                    ? t('No products yet.', 'لا توجد منتجات بعد.')
+                    : t(`No items in "${activeCategory}"`, `لا توجد عناصر في "${activeCategory}"`)}
+              </Text>
+            </View>
+          }
           ListFooterComponent={<Footer />}
         />
       )}
@@ -169,7 +211,12 @@ function Footer() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
 
-  tabs:        { flexGrow: 0, marginTop: SPACING['4'] },
+  tabsWrapper:  {
+    backgroundColor: COLORS.background,
+    paddingVertical: SPACING['2'],
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
   tabsContent: { paddingHorizontal: SPACING['5'], gap: SPACING['2'] },
   tab: {
     paddingHorizontal: SPACING['4'], paddingVertical: SPACING['2'],

@@ -13,6 +13,7 @@ import {
 import { COLORS, TYPOGRAPHY, SPACING, RADII, Z } from '@constants/design';
 import { Button } from '@components/ui/Button';
 import { useUIStore } from '@store/ui.store';
+import { navigationRef } from '@navigation/navigationRef';
 
 const fmt = (n: number) => 'AED ' + Math.round(n).toLocaleString('en-US');
 
@@ -44,16 +45,24 @@ export function SuccessOverlay() {
     return () => loopRef.current?.stop();
   }, [successInfo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!successInfo) return null;
+  const handleDismiss = () => {
+    clearSuccess();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('CatalogTab');
+    }
+  };
 
   const shadowOpacity = glow.interpolate({
     inputRange:  [0, 1],
     outputRange: [0.15, 0.5],
   });
 
+  // Guard AFTER hooks (React rules) but BEFORE JSX that reads successInfo fields
+  if (!successInfo) return null;
+
   return (
     <View style={styles.overlay}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={clearSuccess} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
       <Animated.View style={[styles.glowWrap, { shadowOpacity }]}>
         <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
           <Text style={styles.emoji}>💸</Text>
@@ -69,7 +78,7 @@ export function SuccessOverlay() {
           <Text style={styles.footnote}>
             Nothing was charged. Nothing was shipped. Everything was felt.
           </Text>
-          <Button fullWidth size="lg" onPress={clearSuccess} style={styles.btn}>
+          <Button fullWidth size="lg" onPress={handleDismiss} style={styles.btn}>
             Back to Flexing
           </Button>
         </Animated.View>

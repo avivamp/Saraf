@@ -1,0 +1,32 @@
+How send_broadcast_notification flows end-to-end:
+
+When you run this in Supabase SQL Editor:
+sqlselect send_broadcast_notification(
+  'Flash Sale 🔥',
+  '50% off Gold G-Wagon — today only!',
+  'product',
+  '{"product_id": "gwagon"}'
+);
+
+Here's exactly what happens, step by step:
+1. Supabase (immediate) — a row is inserted into notifications with user_id = NULL (broadcast). This is instant.
+2. In-app inbox (within 30 seconds) — useNotifications uses TanStack Query with staleTime: 1000 * 30. So within 30 seconds of your next interaction, or on the next app focus, the query re-runs and the new notification appears in the inbox. You can also pull-to-refresh on the Notifications screen to see it immediately.
+3. Push notification (not automatic yet) — the SQL function only writes to the notifications table. It does not automatically send an iOS/Android push. To actually send a device push you have two options:
+
+Manual (for testing): query device_tokens for your token, then call Expo's Push API directly:
+
+bash  curl -X POST https://exp.host/--/api/v2/push/send \
+    -H "Content-Type: application/json" \
+    -d '{
+      "to": "ExponentPushToken[your-token-here]",
+      "title": "Flash Sale 🔥",
+      "body": "50% off Gold G-Wagon — today only!",
+      "data": { "type": "product", "product_id": "gwagon" }
+    }'
+
+Automatic (production): create a Supabase Edge Function that triggers on notifications insert, reads the matching device_tokens, and calls the Expo Push API for each one. This is the proper production setup and takes about 30 lines of Deno code — let me know if you want me to write it.
+
+
+------------------------------------------
+
+

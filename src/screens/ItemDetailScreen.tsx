@@ -1,11 +1,14 @@
 /**
  * src/screens/ItemDetailScreen.tsx
- * TODO: image hero, full description layout
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
+  Dimensions,
+  FlatList,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,18 +21,96 @@ import { COLORS, TYPOGRAPHY, SPACING, RADII } from '@constants/design';
 import { Button } from '@components/ui/Button';
 import { useCart } from '@hooks/useCart';
 import { useUIStore } from '@store/ui.store';
-import type { CatalogStackParamList, SelectionMap } from '@types';
+import type { CatalogStackParamList, SelectionMap, ProductImage } from '@types';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const HERO_H = 280;
 
 const fmt = (n: number) => 'AED ' + Math.round(n).toLocaleString('en-US');
 
 type Props = NativeStackScreenProps<CatalogStackParamList, 'ItemDetail'>;
+
+// ── Image carousel ────────────────────────────────────────────
+
+function ImageCarousel({ images, icon, badge }: {
+  images: ProductImage[];
+  icon:   string | null;
+  badge:  string;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    setActiveIndex(index);
+  };
+
+  // Fallback to emoji when no images
+  if (images.length === 0) {
+    return (
+      <View style={styles.hero}>
+        <Text style={styles.heroEmoji}>{icon ?? '📦'}</Text>
+        <View style={styles.heroBadge}>
+          <Text style={styles.heroBadgeText}>{badge}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <FlatList
+        data={images}
+        keyExtractor={(img) => img.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        renderItem={({ item }) => (
+          <View style={styles.slide}>
+            <Image
+              source={{ uri: item.url }}
+              style={styles.slideImage}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+      />
+
+      {/* Badge overlaid on image */}
+      <View style={styles.heroBadge}>
+        <Text style={styles.heroBadgeText}>{badge}</Text>
+      </View>
+
+      {/* Dot indicators — only shown when >1 image */}
+      {images.length > 1 && (
+        <View style={styles.dots}>
+          {images.map((_, i) => (
+            <View
+              key={i}
+              style={[styles.dot, i === activeIndex && styles.dotActive]}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Image counter e.g. "2 / 4" */}
+      {images.length > 1 && (
+        <View style={styles.counter}>
+          <Text style={styles.counterText}>{activeIndex + 1} / {images.length}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────
 
 export function ItemDetailScreen({ route, navigation }: Props) {
   const { product } = route.params;
   const { addItem } = useCart();
   const { pushToast } = useUIStore();
 
-  // Initialise selections to first option of each group
   const initial: SelectionMap = {};
   (product.customizations ?? []).forEach((g) => {
     if (g.options[0]) initial[g.id] = g.options[0];
@@ -47,20 +128,19 @@ export function ItemDetailScreen({ route, navigation }: Props) {
     navigation.goBack();
   };
 
+  // Build images list: use product.images if available, fall back to single image_url
+  const images: ProductImage[] = product.images?.length
+    ? product.images
+    : product.image_url
+      ? [{ id: 'primary', url: product.image_url, alt_text: product.name, sort_order: 0 }]
+      : [];
+
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View style={styles.hero}>
-          {product.image_url ? (
-            <Image source={{ uri: product.image_url }} style={styles.heroImage} resizeMode="cover" />
-          ) : (
-            <Text style={styles.heroEmoji}>{product.icon ?? '📦'}</Text>
-          )}
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>{product.badge}</Text>
-          </View>
-        </View>
+
+        {/* Image carousel */}
+        <ImageCarousel images={images} icon={product.icon} badge={product.badge} />
 
         <View style={styles.body}>
           <Text style={styles.cat}>{product.cat.toUpperCase()}</Text>
@@ -130,18 +210,46 @@ const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: COLORS.background },
   scroll: { paddingBottom: 120 },
 
+  // ── Carousel ───────────────────────────────────────────────
   hero: {
-    height: 240, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center',
-    borderBottomWidth: 1, borderBottomColor: COLORS.border, overflow: 'hidden',
+    height: HERO_H, backgroundColor: COLORS.surface,
+    alignItems: 'center', justifyContent: 'center',
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  heroImage: { width: '100%', height: '100%' },
-  heroEmoji: { fontSize: 80 },
+  slide: {
+    width:            SCREEN_W,
+    height:           HERO_H,
+    backgroundColor:  COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    overflow:         'hidden',
+  },
+  slideImage:  { width: '100%', height: '100%' },
+  heroEmoji:   { fontSize: 80 },
   heroBadge: {
     position: 'absolute', top: SPACING['3'], left: SPACING['3'],
     backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: COLORS.goldSubtle,
     borderRadius: RADII.full, paddingHorizontal: SPACING['3'], paddingVertical: SPACING['1'],
   },
   heroBadgeText: { color: COLORS.goldBright, fontSize: TYPOGRAPHY.size['2xs'], letterSpacing: 0.5, fontWeight: TYPOGRAPHY.weight.semibold },
+  dots: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    paddingVertical: SPACING['2'], gap: SPACING['1'],
+    backgroundColor: COLORS.background,
+  },
+  dot: {
+    width: 6, height: 6, borderRadius: RADII.full,
+    backgroundColor: COLORS.border,
+  },
+  dotActive: {
+    width: 18, backgroundColor: COLORS.gold,
+  },
+  counter: {
+    position: 'absolute', bottom: SPACING['3'] + 18, right: SPACING['3'],
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADII.full,
+    paddingHorizontal: SPACING['3'], paddingVertical: 3,
+  },
+  counterText: { color: COLORS.textPrimary, fontSize: TYPOGRAPHY.size['2xs'], fontWeight: TYPOGRAPHY.weight.semibold },
 
   body:        { padding: SPACING['5'] },
   cat:         { color: COLORS.textSecondary, fontSize: TYPOGRAPHY.size['2xs'], letterSpacing: 1.5, fontWeight: TYPOGRAPHY.weight.semibold, marginBottom: SPACING['1'] },
