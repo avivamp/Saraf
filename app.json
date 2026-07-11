@@ -23,6 +23,11 @@
     "web": {
       "bundler": "metro"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#D4B05E",
+      "iosDisplayInForeground": true
+    },
     "extra": {
       "eas": {
         "projectId": "YOUR_EAS_PROJECT_ID"
