@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -16,6 +16,8 @@ import { useAuthStore, selectUser } from '@store/auth.store';
 import type { ProfileStackParamList } from '@types';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Profile'>;
+
+const HELP_CENTER_URL = 'https://www.finwyl.com/saraf/en/help-center';
 
 // ── Reusable menu row ─────────────────────────────────────────
 function MenuRow({ icon, label, onPress, badge }: {
@@ -104,23 +106,13 @@ export function ProfileScreen({ navigation }: Props) {
       {/* ── Support ── */}
       <SectionHeader label={t('SUPPORT', 'الدعم')} />
       <View style={styles.card}>
-        <MenuRow icon="❓" label={t('Help Center', 'مركز المساعدة')} onPress={() => navigation.navigate('Help')} />
+        <MenuRow icon="❓" label={t('Help Center', 'مركز المساعدة')} onPress={() => Linking.openURL(HELP_CENTER_URL)} />
         {!user && (
           <>
             <View style={styles.divider} />
             <MenuRow icon="💬" label={t('Share Feedback', 'مشاركة الملاحظات')} onPress={() => navigation.navigate('Feedback')} />
           </>
         )}
-      </View>
-
-      {/* ── Policies ── */}
-      <SectionHeader label={t('POLICIES', 'السياسات')} />
-      <View style={styles.card}>
-        <MenuRow icon="↩️" label={t('Return Policy',     'سياسة الإرجاع')}   onPress={() => navigation.navigate('Policy', { policyId: 'return' })} />
-        <View style={styles.divider} />
-        <MenuRow icon="🔒" label={t('Privacy Policy',    'سياسة الخصوصية')}  onPress={() => navigation.navigate('Policy', { policyId: 'privacy' })} />
-        <View style={styles.divider} />
-        <MenuRow icon="⚖️" label={t('Consumer Rights',   'حقوق المستهلك')}   onPress={() => navigation.navigate('Policy', { policyId: 'consumer_rights' })} />
       </View>
 
       {/* ── Sign out ── */}
