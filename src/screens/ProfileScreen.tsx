@@ -91,8 +91,6 @@ export function ProfileScreen({ navigation }: Props) {
             <MenuRow icon="🔔" label={t('Notifications', 'الإشعارات')} badge={unreadCount} onPress={() => navigation.navigate('Notifications')} />
             <View style={styles.divider} />
             <MenuRow icon="📦" label={t('My Orders', 'طلباتي')}         onPress={() => navigation.navigate('Orders')} />
-            <View style={styles.divider} />
-            <MenuRow icon="💬" label={t('Share Feedback', 'مشاركة الملاحظات')} onPress={() => navigation.navigate('Feedback')} />
           </View>
         </>
       )}
@@ -107,12 +105,8 @@ export function ProfileScreen({ navigation }: Props) {
       <SectionHeader label={t('SUPPORT', 'الدعم')} />
       <View style={styles.card}>
         <MenuRow icon="❓" label={t('Help Center', 'مركز المساعدة')} onPress={() => Linking.openURL(HELP_CENTER_URL)} />
-        {!user && (
-          <>
-            <View style={styles.divider} />
-            <MenuRow icon="💬" label={t('Share Feedback', 'مشاركة الملاحظات')} onPress={() => navigation.navigate('Feedback')} />
-          </>
-        )}
+        <View style={styles.divider} />
+        <MenuRow icon="💬" label={t('Share Feedback', 'مشاركة الملاحظات')} onPress={() => navigation.navigate('Feedback')} />
       </View>
 
       {/* ── Sign out ── */}

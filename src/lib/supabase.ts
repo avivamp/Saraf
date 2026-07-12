@@ -60,7 +60,7 @@ class _URL {
 
 function _urlWorks(): boolean {
   try {
-    const u = new (global as any).URL('https://example.supabase.co/auth/v1');
+    const u = new (globalThis as any).URL('https://example.supabase.co/auth/v1');
     return u.protocol === 'https:' && u.hostname === 'example.supabase.co';
   } catch { return false; }
 }
@@ -73,8 +73,8 @@ if (Platform.OS !== 'web') {
   } catch { /* package not available */ }
 
   if (!_urlWorks()) {
-    (global as any).URL = _URL;
-    (global as any).URLSearchParams = _URLSearchParams;
+    (globalThis as any).URL = _URL;
+    (globalThis as any).URLSearchParams = _URLSearchParams;
   }
 }
 
@@ -84,7 +84,7 @@ const SUPABASE_ANON = 'sb_publishable_BgFKt-WM3AYTGic7rfYkZQ_CuF8k47q';
 
 // ── Singleton ────────────────────────────────────────────────────────────
 // Stored on global so Fast Refresh never creates a second GoTrueClient.
-const _global = global as typeof global & { __sarafSupabase?: SupabaseClient };
+const _global = globalThis as typeof globalThis & { __sarafSupabase?: SupabaseClient };
 
 if (!_global.__sarafSupabase) {
   _global.__sarafSupabase = createClient(SUPABASE_URL, SUPABASE_ANON, {

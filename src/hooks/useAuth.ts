@@ -46,7 +46,7 @@ export function useAuth() {
   // ── Actions ──────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await AuthService.signIn(email, password);
-    if (result.error) return result;
+    if (!result.data) return result;
     setUser(result.data.user);
     pushToast(`Welcome back!`);
     return result;
@@ -54,7 +54,7 @@ export function useAuth() {
 
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const result = await AuthService.signUp(email, password, fullName);
-    if (result.error) return result;
+    if (!result.data) return result;
     if (!result.data.requiresConfirmation) {
       setUser(result.data.user);
     }

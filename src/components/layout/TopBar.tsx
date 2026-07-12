@@ -20,7 +20,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADII, ANIMATION } from '@constants/design
 
 interface Props {
   cartCount:      number;
-  user:           { email: string } | null;
+  user:           { email?: string } | null;
   onPressCart:    () => void;
   onPressAccount: () => void;
   onPressBell:    () => void;
@@ -88,7 +88,7 @@ export function TopBar({
   const inputOpacity = searchAnim.interpolate({ inputRange: [0.3, 1], outputRange: [0, 1],   extrapolate: 'clamp' });
   const inputWidth   = searchAnim.interpolate({ inputRange: [0, 1],   outputRange: ['0%', '100%'] });
 
-  const initial = user?.email.charAt(0).toUpperCase() ?? '';
+  const initial = user?.email?.charAt(0).toUpperCase() ?? '';
 
   return (
     <View style={styles.bar}>
